@@ -75,6 +75,7 @@ export class TranslationManager {
         // Section Navigation
         'previous-section': { de: 'Vorherige', en: 'Previous' },
         'next-section': { de: 'Nächste', en: 'Next' },
+        'finish-section': { de: 'Fertig', en: 'Finish' },
         'section-text': { de: 'Abschnitt', en: 'Section' },
         
         // Summary View
@@ -92,6 +93,8 @@ export class TranslationManager {
         'apply-filter-text': { de: 'Filter anwenden', en: 'Apply Filter' },
         'select-all-text': { de: 'Alle auswählen', en: 'Select All' },
         'deselect-all-text': { de: 'Alle abwählen', en: 'Deselect All' },
+        'generate-report-text': { de: '📊 Bericht generieren', en: '📊 Generate Report' },
+        'no-records-selected': { de: 'Keine Datensätze ausgewählt. Bitte wählen Sie mindestens einen Datensatz aus.', en: 'No records selected. Please select at least one record.' },
         
         // Grid Columns
         'col-include': { de: 'Bericht', en: 'Report' },

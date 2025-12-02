@@ -120,6 +120,9 @@ export class ChecklistApp {
         document.getElementById('deselect-all-btn')?.addEventListener('click', () => {
             this.deselectAll();
         });
+        document.getElementById('generate-report-from-grid-btn')?.addEventListener('click', () => {
+            this.generateReportFromGrid();
+        });
 
         // Report actions
         document.getElementById('back-to-list-from-report')?.addEventListener('click', () => {
@@ -670,20 +673,27 @@ export class ChecklistApp {
         const isLastSection = this.currentSectionIndex === this.sections.length - 1;
 
         nav.innerHTML = `
-            <button id="prev-section-btn" class="btn-secondary" ${isFirstSection ? 'disabled' : ''}>
+            <button id="prev-section-btn" class="btn-secondary">
                 ← ${this.translationManager.translate('previous-section') || 'Vorherige'}
             </button>
             <span class="section-indicator">
                 ${this.translationManager.translate('section-text') || 'Abschnitt'} ${this.currentSectionIndex + 1} / ${this.sections.length}
             </span>
-            <button id="next-section-btn" class="btn-primary" ${isLastSection ? 'disabled' : ''}>
-                ${this.translationManager.translate('next-section') || 'Nächste'} →
+            <button id="next-section-btn" class="btn-primary">
+                ${isLastSection ? '✓ ' : ''}${isLastSection ? (this.translationManager.translate('finish-section') || 'Fertig') : (this.translationManager.translate('next-section') || 'Nächste')} ${isLastSection ? '' : '→'}
             </button>
         `;
 
         // Add event listeners
-        const prevBtn = document.getElementById('prev-section-btn');
-        const nextBtn = document.getElementById('next-section-btn');
+        const prevBtn = document.getElementById('prev-section-btn') as HTMLButtonElement;
+        const nextBtn = document.getElementById('next-section-btn') as HTMLButtonElement;
+
+        // Set disabled state
+        if (prevBtn) {
+            prevBtn.disabled = isFirstSection;
+            prevBtn.style.opacity = isFirstSection ? '0.5' : '1';
+            prevBtn.style.cursor = isFirstSection ? 'not-allowed' : 'pointer';
+        }
 
         prevBtn?.addEventListener('click', () => {
             if (this.currentSectionIndex > 0) {
@@ -890,12 +900,20 @@ export class ChecklistApp {
 
         container.innerHTML = summaryHtml;
         if (nav) nav.style.display = 'none';
+        
+        // Hide top submit button and show meta info
+        const submitBtn = document.getElementById('submit-checklist-btn');
+        const metaSection = document.querySelector('.fill-meta') as HTMLElement;
+        if (submitBtn) submitBtn.style.display = 'none';
+        if (metaSection) metaSection.style.display = 'none';
 
         // Event listeners
         document.getElementById('back-to-edit-btn')?.addEventListener('click', () => {
             this.currentSectionIndex = this.sections.length - 1;
             this.renderCurrentSection();
             if (nav) nav.style.display = 'flex';
+            if (submitBtn) submitBtn.style.display = 'inline-block';
+            if (metaSection) metaSection.style.display = 'block';
         });
 
         document.getElementById('confirm-save-btn')?.addEventListener('click', () => {
@@ -1132,6 +1150,22 @@ export class ChecklistApp {
         });
 
         this.dataManager.saveResponses(this.currentChecklist.id, this.responses);
+    }
+
+    private generateReportFromGrid(): void {
+        // Get selected rows from filteredResponses
+        const selectedResponses = this.filteredResponses.filter(r => r.includeInReport);
+        
+        if (selectedResponses.length === 0) {
+            alert(this.translationManager.translate('no-records-selected') || 'Keine Datensätze ausgewählt');
+            return;
+        }
+
+        // Generate report with selected data
+        this.generateReport();
+        
+        // Switch to report view
+        this.showView('report-generator');
     }
 
     private generateReport(): void {

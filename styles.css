@@ -570,6 +570,12 @@ button:disabled {
 .selection-controls {
     display: flex;
     gap: 0.5rem;
+    align-items: center;
+}
+
+.selection-controls #generate-report-from-grid-btn {
+    margin-left: auto;
+    font-weight: 600;
 }
 
 /* Response Grid */
