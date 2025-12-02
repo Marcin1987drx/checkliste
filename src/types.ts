@@ -8,7 +8,9 @@ export type QuestionType =
     | 'scale'
     | 'short_text'
     | 'long_text'
-    | 'header';
+    | 'header'
+    | 'qr_code_compare'
+    | 'attachment';
 
 export type Language = 'de' | 'en';
 
@@ -27,8 +29,13 @@ export interface Question {
     scaleMin?: number; // For scale
     scaleMax?: number; // For scale
     order: number;
-    imageBase64?: string; // Image attached to question
-    imageName?: string; // Original filename
+    images?: QuestionImage[]; // Multiple images attached to question
+}
+
+export interface QuestionImage {
+    base64?: string;      // Base64 data
+    name?: string;        // Original filename
+    path?: string;        // Path to file: 'images/filename.jpg'
 }
 
 export interface Checklist {
@@ -39,6 +46,7 @@ export interface Checklist {
     reportSettings?: {
         title?: string;
         customFields?: Record<string, string>;
+        logo?: QuestionImage;  // Company logo for report
     };
 }
 

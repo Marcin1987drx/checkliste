@@ -31,6 +31,69 @@ export class DataManager {
         return this.workingFolder;
     }
 
+    /**
+     * Save image to images folder and return relative path
+     */
+    public async saveImage(base64Data: string, originalName: string): Promise<string | null> {
+        if (!this.workingFolder) return null;
+
+        try {
+            // Create images folder if it doesn't exist
+            const imagesFolder = await this.workingFolder.getDirectoryHandle('images', { create: true });
+
+            // Generate unique filename
+            const timestamp = Date.now();
+            const extension = originalName.split('.').pop() || 'png';
+            const filename = `${timestamp}_${originalName.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+
+            // Convert base64 to blob
+            const base64Content = base64Data.split(',')[1];
+            const byteCharacters = atob(base64Content);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            const blob = new Blob([byteArray], { type: 'image/' + extension });
+
+            // Write file
+            const fileHandle = await imagesFolder.getFileHandle(filename, { create: true });
+            const writable = await fileHandle.createWritable();
+            await writable.write(blob);
+            await writable.close();
+
+            return `images/${filename}`;
+        } catch (err) {
+            console.error('Error saving image:', err);
+            return null;
+        }
+    }
+
+    /**
+     * Load image from images folder and return as base64
+     */
+    public async loadImage(relativePath: string): Promise<string | null> {
+        if (!this.workingFolder) return null;
+
+        try {
+            const parts = relativePath.split('/');
+            if (parts.length !== 2 || parts[0] !== 'images') return null;
+
+            const imagesFolder = await this.workingFolder.getDirectoryHandle('images', { create: false });
+            const fileHandle = await imagesFolder.getFileHandle(parts[1], { create: false });
+            const file = await fileHandle.getFile();
+            
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result as string);
+                reader.readAsDataURL(file);
+            });
+        } catch (err) {
+            console.error('Error loading image:', err);
+            return null;
+        }
+    }
+
     public async listChecklists(): Promise<string[]> {
         if (!this.workingFolder) {
             return [];
@@ -61,12 +124,28 @@ export class DataManager {
         }
 
         try {
-            const fileHandle = await this.workingFolder.getFileHandle(`${checklistId}.json`);
+            const fileHandle = await this.workingFolder.getFileHandle(`${checklistId}.json`, { create: false });
             const file = await fileHandle.getFile();
             const content = await file.text();
-            return JSON.parse(content) as Checklist;
+            const checklist = JSON.parse(content) as Checklist;
+
+            // Load images from folder
+            for (const question of checklist.questions) {
+                if (question.images) {
+                    for (const img of question.images) {
+                        if (img.path && !img.base64) {
+                            const base64 = await this.loadImage(img.path);
+                            if (base64) {
+                                img.base64 = base64;
+                            }
+                        }
+                    }
+                }
+            }
+
+            return checklist;
         } catch (err) {
-            console.error(`Error loading checklist ${checklistId}:`, err);
+            console.error('Error loading checklist:', err);
             return null;
         }
     }
@@ -77,9 +156,27 @@ export class DataManager {
         }
 
         try {
+            // Save images to folder and update paths
+            const checklistCopy = JSON.parse(JSON.stringify(checklist)) as Checklist;
+            for (const question of checklistCopy.questions) {
+                if (question.images) {
+                    for (const img of question.images) {
+                        if (img.base64 && !img.path) {
+                            // Save new image
+                            const imagePath = await this.saveImage(img.base64, img.name || 'image.png');
+                            if (imagePath) {
+                                img.path = imagePath;
+                                // Keep base64 for backward compatibility but could be removed to save space
+                                // delete img.base64;
+                            }
+                        }
+                    }
+                }
+            }
+
             const fileHandle = await this.workingFolder.getFileHandle(`${checklist.id}.json`, { create: true });
             const writable = await fileHandle.createWritable();
-            await writable.write(JSON.stringify(checklist, null, 2));
+            await writable.write(JSON.stringify(checklistCopy, null, 2));
             await writable.close();
             return true;
         } catch (err) {

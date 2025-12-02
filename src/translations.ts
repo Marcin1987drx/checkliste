@@ -55,7 +55,20 @@ export class TranslationManager {
         'type-scale': { de: 'Skala', en: 'Scale' },
         'type-short_text': { de: 'Kurzer Text', en: 'Short Text' },
         'type-long_text': { de: 'Langer Text', en: 'Long Text' },
+        'type-qr_code_compare': { de: 'QR Code Vergleich', en: 'QR Code Compare' },
         'type-header': { de: 'Überschrift/Sektion', en: 'Header/Section' },
+        
+        // QR Code Compare
+        'qr-code-1': { de: 'QR Code 1 (Paket):', en: 'QR Code 1 (Package):' },
+        'qr-code-2': { de: 'QR Code 2 (Teil):', en: 'QR Code 2 (Part):' },
+        'qr-scan-placeholder': { de: 'QR Code scannen oder eingeben', en: 'Scan or enter QR code' },
+        'qr-match': { de: 'Übereinstimmung - OK', en: 'Match - OK' },
+        'qr-no-match': { de: 'Keine Übereinstimmung - NOK', en: 'No Match - NOK' },
+        'select-checklist-for-grid': { de: 'Checkliste für Antworten auswählen', en: 'Select Checklist for Responses' },
+        'question-images': { de: 'Bilder hinzufügen', en: 'Add Images' },
+        'type-attachment': { de: 'Anhang/Datei-Upload', en: 'Attachment/File Upload' },
+        'no-responses-yet': { de: 'Noch keine Antworten vorhanden.', en: 'No responses yet.' },
+        'fill-checklist-first': { de: 'Füllen Sie die Checkliste aus, um Daten zu sehen.', en: 'Fill the checklist to see data.' },
         
         // Fill View
         'back-text-fill': { de: 'Zurück', en: 'Back' },

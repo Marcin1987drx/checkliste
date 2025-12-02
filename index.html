@@ -86,6 +86,11 @@
                             <label id="checklist-desc-label">Beschreibung:</label>
                             <textarea id="checklist-description" class="form-input" rows="2"></textarea>
                         </div>
+                        <div class="form-group">
+                            <label id="checklist-logo-label">Report Logo:</label>
+                            <input type="file" id="checklist-logo" class="form-input" accept="image/*">
+                            <div id="logo-preview" class="logo-preview"></div>
+                        </div>
                     </div>
                     <div class="questions-section">
                         <div class="section-header">
@@ -137,6 +142,7 @@
                     <button id="back-to-list-from-grid" class="btn-secondary">← <span id="back-text-grid">Zurück</span></button>
                     <h2 id="grid-title">Antworten Datenbank</h2>
                 </div>
+                <div id="checklist-selector" class="checklist-selector"></div>
                 <div class="grid-controls">
                     <div class="filter-group">
                         <label id="filter-from-label">Von:</label>

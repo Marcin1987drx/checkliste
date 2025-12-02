@@ -195,6 +195,7 @@ export class ChecklistApp {
             }
 
             document.getElementById('create-checklist-btn')?.removeAttribute('disabled');
+            document.getElementById('tab-grid')?.removeAttribute('disabled');
             
             await this.loadChecklistList();
         }
@@ -304,6 +305,54 @@ export class ChecklistApp {
         (document.getElementById('checklist-name') as HTMLInputElement).value = checklist.name;
         (document.getElementById('checklist-description') as HTMLTextAreaElement).value = checklist.description;
 
+        // Load logo
+        const logoPreview = document.getElementById('logo-preview');
+        if (logoPreview) {
+            if (checklist.reportSettings?.logo?.base64) {
+                logoPreview.innerHTML = `
+                    <img src="${checklist.reportSettings.logo.base64}" alt="Logo" style="max-width: 200px; max-height: 100px;" />
+                    <button type="button" class="btn-secondary" id="remove-logo-btn">✕ Remove</button>
+                `;
+                document.getElementById('remove-logo-btn')?.addEventListener('click', () => {
+                    if (this.currentChecklist?.reportSettings) {
+                        this.currentChecklist.reportSettings.logo = undefined;
+                        if (logoPreview) logoPreview.innerHTML = '';
+                    }
+                });
+            } else {
+                logoPreview.innerHTML = '';
+            }
+        }
+
+        // Logo upload handler
+        const logoInput = document.getElementById('checklist-logo') as HTMLInputElement;
+        logoInput.addEventListener('change', async (e) => {
+            const file = (e.target as HTMLInputElement).files?.[0];
+            if (file && this.currentChecklist) {
+                const base64 = await this.fileToBase64(file);
+                if (!this.currentChecklist.reportSettings) {
+                    this.currentChecklist.reportSettings = {};
+                }
+                this.currentChecklist.reportSettings.logo = {
+                    base64: base64,
+                    name: file.name
+                };
+                // Refresh preview
+                if (logoPreview) {
+                    logoPreview.innerHTML = `
+                        <img src="${base64}" alt="Logo" style="max-width: 200px; max-height: 100px;" />
+                        <button type="button" class="btn-secondary" id="remove-logo-btn">✕ Remove</button>
+                    `;
+                    document.getElementById('remove-logo-btn')?.addEventListener('click', () => {
+                        if (this.currentChecklist?.reportSettings) {
+                            this.currentChecklist.reportSettings.logo = undefined;
+                            if (logoPreview) logoPreview.innerHTML = '';
+                        }
+                    });
+                }
+            }
+        });
+
         this.renderQuestions();
         this.showView('checklist-editor');
     }
@@ -356,6 +405,8 @@ export class ChecklistApp {
                             <option value="scale" ${question.type === 'scale' ? 'selected' : ''}>${this.translationManager.translate('type-scale')}</option>
                             <option value="short_text" ${question.type === 'short_text' ? 'selected' : ''}>${this.translationManager.translate('type-short_text')}</option>
                             <option value="long_text" ${question.type === 'long_text' ? 'selected' : ''}>${this.translationManager.translate('type-long_text')}</option>
+                            <option value="qr_code_compare" ${question.type === 'qr_code_compare' ? 'selected' : ''}>${this.translationManager.translate('type-qr_code_compare')}</option>
+                            <option value="attachment" ${question.type === 'attachment' ? 'selected' : ''}>${this.translationManager.translate('type-attachment')}</option>
                             <option value="header" ${question.type === 'header' ? 'selected' : ''}>${this.translationManager.translate('type-header')}</option>
                         </select>
                     </div>
@@ -381,14 +432,16 @@ export class ChecklistApp {
                     </label>
                 </div>
                 <div class="form-group">
-                    <label>${this.translationManager.translate('question-image') || 'Bild hinzuf\u00fcgen'}</label>
-                    <input type="file" class="form-input q-image" accept="image/*">
-                    ${question.imageBase64 ? `
-                        <div class="image-preview">
-                            <img src="${question.imageBase64}" alt="${question.imageName || 'Preview'}" />
-                            <button type="button" class="btn-secondary btn-remove-image">\u00d7 ${this.translationManager.translate('remove-image') || 'Entfernen'}</button>
-                        </div>
-                    ` : ''}
+                    <label>${this.translationManager.translate('question-images') || 'Bilder hinzuf\u00fcgen'}</label>
+                    <input type="file" class="form-input q-images" accept="image/*" multiple>
+                    <div class="images-gallery">
+                        ${(question.images || []).map((img, idx) => `
+                            <div class="image-preview" data-image-index="${idx}">
+                                <img src="${img.base64}" alt="${img.name || 'Preview'}" />
+                                <button type="button" class="btn-secondary btn-remove-image" data-image-index="${idx}">\u00d7</button>
+                            </div>
+                        `).join('')}
+                    </div>
                 </div>
             </div>
         `;
@@ -399,23 +452,34 @@ export class ChecklistApp {
         div.querySelector('.btn-duplicate')?.addEventListener('click', () => this.duplicateQuestion(question.id));
         div.querySelector('.btn-delete')?.addEventListener('click', () => this.deleteQuestion(question.id));
         
-        // Image upload
-        const imageInput = div.querySelector('.q-image') as HTMLInputElement;
-        imageInput?.addEventListener('change', async (e) => {
-            const file = (e.target as HTMLInputElement).files?.[0];
-            if (file) {
-                const base64 = await this.fileToBase64(file);
-                question.imageBase64 = base64;
-                question.imageName = file.name;
+        // Images upload
+        const imagesInput = div.querySelector('.q-images') as HTMLInputElement;
+        imagesInput?.addEventListener('change', async (e) => {
+            const files = (e.target as HTMLInputElement).files;
+            if (files) {
+                if (!question.images) question.images = [];
+                for (let i = 0; i < files.length; i++) {
+                    const file = files[i];
+                    const base64 = await this.fileToBase64(file);
+                    question.images.push({
+                        base64: base64,
+                        name: file.name
+                    });
+                }
                 this.renderQuestions();
             }
         });
         
         // Remove image
-        div.querySelector('.btn-remove-image')?.addEventListener('click', () => {
-            question.imageBase64 = undefined;
-            question.imageName = undefined;
-            this.renderQuestions();
+        div.querySelectorAll('.btn-remove-image').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const target = e.currentTarget as HTMLElement;
+                const index = parseInt(target.getAttribute('data-image-index') || '0');
+                if (question.images) {
+                    question.images.splice(index, 1);
+                    this.renderQuestions();
+                }
+            });
         });
 
         // Auto-save on change
@@ -615,13 +679,19 @@ export class ChecklistApp {
             if (question.type === 'header') {
                 div.innerHTML = `<h3 class="section-title">${questionText}</h3>`;
             } else {
-                let imageHtml = '';
-                if (question.imageBase64) {
-                    imageHtml = `<div class="question-image"><img src="${question.imageBase64}" alt="${question.imageName || 'Question image'}" /></div>`;
+                let imagesHtml = '';
+                if (question.images && question.images.length > 0) {
+                    imagesHtml = `<div class="question-images-gallery">
+                        ${question.images.map(img => `
+                            <div class="question-image">
+                                <img src="${img.base64}" alt="${img.name || 'Question image'}" />
+                            </div>
+                        `).join('')}
+                    </div>`;
                 }
                 div.innerHTML = `
                     <div class="fill-question-text">${questionText}</div>
-                    ${imageHtml}
+                    ${imagesHtml}
                     ${this.createAnswerControl(question)}
                 `;
             }
@@ -649,6 +719,67 @@ export class ChecklistApp {
                 const value = target.getAttribute('data-value');
                 if (value === 'OK') target.classList.add('ok');
                 if (value === 'NOK') target.classList.add('nok');
+            });
+        });
+
+        // Setup QR code compare
+        document.querySelectorAll('.qr-compare-container').forEach(container => {
+            const input1 = container.querySelector('.qr-code-1') as HTMLInputElement;
+            const input2 = container.querySelector('.qr-code-2') as HTMLInputElement;
+            const resultDiv = container.querySelector('.qr-result') as HTMLElement;
+            const resultText = container.querySelector('.qr-result-text') as HTMLElement;
+
+            const compareQRCodes = () => {
+                const code1 = input1?.value.trim();
+                const code2 = input2?.value.trim();
+
+                if (code1 && code2) {
+                    const match = code1 === code2;
+                    resultDiv.style.display = 'block';
+                    resultDiv.className = `qr-result ${match ? 'qr-match' : 'qr-no-match'}`;
+                    resultText.textContent = match ? 
+                        `✓ ${this.translationManager.translate('qr-match') || 'Übereinstimmung - OK'}` : 
+                        `✗ ${this.translationManager.translate('qr-no-match') || 'Keine Übereinstimmung - NOK'}`;
+                } else {
+                    resultDiv.style.display = 'none';
+                }
+            };
+
+            input1?.addEventListener('input', compareQRCodes);
+            input2?.addEventListener('input', compareQRCodes);
+        });
+
+        // Setup attachment upload
+        document.querySelectorAll('.attachment-input').forEach(input => {
+            input.addEventListener('change', async (e) => {
+                const target = e.target as HTMLInputElement;
+                const files = target.files;
+                const container = target.closest('.attachment-container');
+                const listDiv = container?.querySelector('.attachment-list') as HTMLElement;
+                
+                if (files && listDiv) {
+                    for (let i = 0; i < files.length; i++) {
+                        const file = files[i];
+                        const base64 = await this.fileToBase64(file);
+                        
+                        const attachmentDiv = document.createElement('div');
+                        attachmentDiv.className = 'attachment-item';
+                        attachmentDiv.setAttribute('data-filename', file.name);
+                        attachmentDiv.setAttribute('data-base64', base64);
+                        attachmentDiv.innerHTML = `
+                            <span class="attachment-name">📎 ${file.name}</span>
+                            <button type="button" class="btn-secondary btn-remove-attachment">✕</button>
+                        `;
+                        
+                        attachmentDiv.querySelector('.btn-remove-attachment')?.addEventListener('click', () => {
+                            attachmentDiv.remove();
+                        });
+                        
+                        listDiv.appendChild(attachmentDiv);
+                    }
+                    // Clear input
+                    target.value = '';
+                }
             });
         });
     }
@@ -704,12 +835,14 @@ export class ChecklistApp {
         });
 
         nextBtn?.addEventListener('click', () => {
+            console.log('Next button clicked, isLastSection:', isLastSection);
             this.saveCurrentSectionAnswers();
             if (this.currentSectionIndex < this.sections.length - 1) {
                 this.currentSectionIndex++;
                 this.renderCurrentSection();
             } else {
                 // Last section - show summary
+                console.log('Showing summary...');
                 this.showSummary();
             }
         });
@@ -738,6 +871,28 @@ export class ChecklistApp {
                 answer = (item.querySelector('.answer-select') as HTMLSelectElement).value;
             } else if (question.type === 'short_text' || question.type === 'long_text') {
                 answer = (item.querySelector('.answer-text') as HTMLInputElement | HTMLTextAreaElement).value;
+            } else if (question.type === 'qr_code_compare') {
+                const code1 = (item.querySelector('.qr-code-1') as HTMLInputElement)?.value.trim();
+                const code2 = (item.querySelector('.qr-code-2') as HTMLInputElement)?.value.trim();
+                if (code1 && code2) {
+                    answer = code1 === code2 ? 'OK' : 'NOK';
+                    // Store both codes for reference
+                    this.currentAnswers[`${question.id}_code1`] = code1;
+                    this.currentAnswers[`${question.id}_code2`] = code2;
+                }
+            } else if (question.type === 'attachment') {
+                const attachments: any[] = [];
+                item.querySelectorAll('.attachment-item').forEach(att => {
+                    const filename = att.getAttribute('data-filename');
+                    const base64 = att.getAttribute('data-base64');
+                    if (filename && base64) {
+                        attachments.push({ name: filename, data: base64 });
+                    }
+                });
+                if (attachments.length > 0) {
+                    answer = `${attachments.length} file(s)`;
+                    this.currentAnswers[`${question.id}_attachments`] = JSON.stringify(attachments);
+                }
             }
 
             if (answer) {
@@ -779,6 +934,42 @@ export class ChecklistApp {
                 } else if (question.type === 'short_text' || question.type === 'long_text') {
                     const input = item.querySelector('.answer-text') as HTMLInputElement | HTMLTextAreaElement;
                     if (input) input.value = answer;
+                } else if (question.type === 'qr_code_compare') {
+                    const code1Input = item.querySelector('.qr-code-1') as HTMLInputElement;
+                    const code2Input = item.querySelector('.qr-code-2') as HTMLInputElement;
+                    const code1 = this.currentAnswers[`${question.id}_code1`];
+                    const code2 = this.currentAnswers[`${question.id}_code2`];
+                    if (code1Input && code1) code1Input.value = code1;
+                    if (code2Input && code2) code2Input.value = code2;
+                    // Trigger comparison to show result
+                    if (code1 && code2) {
+                        const event = new Event('input');
+                        code2Input.dispatchEvent(event);
+                    }
+                } else if (question.type === 'attachment') {
+                    const attachmentsJson = this.currentAnswers[`${question.id}_attachments`];
+                    if (attachmentsJson) {
+                        const attachments = JSON.parse(attachmentsJson);
+                        const listDiv = item.querySelector('.attachment-list') as HTMLElement;
+                        if (listDiv) {
+                            attachments.forEach((att: any) => {
+                                const attachmentDiv = document.createElement('div');
+                                attachmentDiv.className = 'attachment-item';
+                                attachmentDiv.setAttribute('data-filename', att.name);
+                                attachmentDiv.setAttribute('data-base64', att.data);
+                                attachmentDiv.innerHTML = `
+                                    <span class="attachment-name">📎 ${att.name}</span>
+                                    <button type="button" class="btn-secondary btn-remove-attachment">✕</button>
+                                `;
+                                
+                                attachmentDiv.querySelector('.btn-remove-attachment')?.addEventListener('click', () => {
+                                    attachmentDiv.remove();
+                                });
+                                
+                                listDiv.appendChild(attachmentDiv);
+                            });
+                        }
+                    }
                 }
             });
         }, 100);
@@ -824,6 +1015,31 @@ export class ChecklistApp {
             case 'long_text':
                 return `<textarea class="form-input answer-text" rows="3"></textarea>`;
 
+            case 'qr_code_compare':
+                return `
+                    <div class="qr-compare-container">
+                        <div class="qr-input-group">
+                            <label class="qr-label">${this.translationManager.translate('qr-code-1') || 'QR Code 1 (Paket):'}</label>
+                            <input type="text" class="form-input qr-code-1" placeholder="${this.translationManager.translate('qr-scan-placeholder') || 'QR Code scannen oder eingeben'}">
+                        </div>
+                        <div class="qr-input-group">
+                            <label class="qr-label">${this.translationManager.translate('qr-code-2') || 'QR Code 2 (Teil):'}</label>
+                            <input type="text" class="form-input qr-code-2" placeholder="${this.translationManager.translate('qr-scan-placeholder') || 'QR Code scannen oder eingeben'}">
+                        </div>
+                        <div class="qr-result" style="display: none;">
+                            <span class="qr-result-text"></span>
+                        </div>
+                    </div>
+                `;
+
+            case 'attachment':
+                return `
+                    <div class="attachment-container">
+                        <input type="file" class="form-input attachment-input" accept="image/*,.pdf,.doc,.docx,.xlsx,.xls" multiple>
+                        <div class="attachment-list"></div>
+                    </div>
+                `;
+
             default:
                 return '';
         }
@@ -837,16 +1053,21 @@ export class ChecklistApp {
         if (!container) return;
 
         const lang = this.translationManager.getLanguage();
-        let ioParts = 0;
-        let nioParts = 0;
+        let okCount = 0;
+        let nokCount = 0;
 
-        // Calculate IO/NIO
+        console.log('Current answers:', this.currentAnswers);
+
+        // Calculate all OK/NOK answers
         this.currentChecklist.questions.forEach(question => {
-            if (question.type === 'header' || !question.includeInIoNio) return;
+            if (question.type === 'header') return;
             const answer = this.currentAnswers[question.id];
-            if (answer === 'OK') ioParts++;
-            else if (answer === 'NOK') nioParts++;
+            console.log(`Question ${question.id}: ${answer}`);
+            if (answer === 'OK') okCount++;
+            else if (answer === 'NOK') nokCount++;
         });
+
+        console.log('OK count:', okCount, 'NOK count:', nokCount);
 
         // Build summary HTML
         let summaryHtml = `
@@ -855,11 +1076,11 @@ export class ChecklistApp {
                 <div class="summary-stats">
                     <div class="stat-box stat-ok">
                         <div class="stat-label">✓ ${this.translationManager.translate('summary-ok') || 'OK'}</div>
-                        <div class="stat-value">${ioParts}</div>
+                        <div class="stat-value">${okCount}</div>
                     </div>
                     <div class="stat-box stat-nok">
                         <div class="stat-label">✗ ${this.translationManager.translate('summary-nok') || 'NOK'}</div>
-                        <div class="stat-value">${nioParts}</div>
+                        <div class="stat-value">${nokCount}</div>
                     </div>
                 </div>
                 <div class="summary-questions">
@@ -980,12 +1201,67 @@ export class ChecklistApp {
     }
 
     private async loadResponseGrid(): Promise<void> {
-        if (!this.currentChecklist) return;
+        const checklistIds = await this.dataManager.listChecklists();
+        
+        if (checklistIds.length === 0) {
+            const container = document.getElementById('response-grid');
+            if (container) {
+                container.innerHTML = '<div class="empty-state"><p>Keine Checklisten vorhanden.</p></div>';
+            }
+            return;
+        }
 
-        this.responses = await this.dataManager.loadResponses(this.currentChecklist.id);
-        this.filteredResponses = [...this.responses];
+        // Load all checklists
+        const checklists = [];
+        for (const id of checklistIds) {
+            const checklist = await this.dataManager.loadChecklist(id);
+            if (checklist) checklists.push(checklist);
+        }
 
-        this.renderResponseGrid();
+        // If no current checklist selected, select first one
+        if (!this.currentChecklist && checklists.length > 0) {
+            this.currentChecklist = checklists[0];
+        }
+
+        // Render checklist selector
+        this.renderChecklistSelector(checklists);
+
+        // Load responses for current checklist
+        if (this.currentChecklist) {
+            this.responses = await this.dataManager.loadResponses(this.currentChecklist.id);
+            this.filteredResponses = [...this.responses];
+            this.renderResponseGrid();
+        }
+    }
+
+    private renderChecklistSelector(checklists: any[]): void {
+        const selectorContainer = document.getElementById('checklist-selector');
+        if (!selectorContainer) return;
+
+        let html = '<div class="checklist-tabs">';
+        checklists.forEach(checklist => {
+            const isActive = this.currentChecklist?.id === checklist.id;
+            html += `
+                <button class="checklist-tab ${isActive ? 'active' : ''}" data-checklist-id="${checklist.id}">
+                    ${checklist.name}
+                </button>
+            `;
+        });
+        html += '</div>';
+        
+        selectorContainer.innerHTML = html;
+
+        // Add event listeners
+        selectorContainer.querySelectorAll('.checklist-tab').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const target = e.currentTarget as HTMLElement;
+                const checklistId = target.getAttribute('data-checklist-id');
+                if (checklistId) {
+                    this.currentChecklist = await this.dataManager.loadChecklist(checklistId);
+                    await this.loadResponseGrid();
+                }
+            });
+        });
     }
 
     private applyFilter(): void {
@@ -1007,11 +1283,6 @@ export class ChecklistApp {
     private renderResponseGrid(): void {
         const container = document.getElementById('response-grid');
         if (!container || !this.currentChecklist) return;
-
-        if (this.filteredResponses.length === 0) {
-            container.innerHTML = '<p>No responses found.</p>';
-            return;
-        }
 
         const questionIds = this.currentChecklist.questions
             .filter(q => q.type !== 'header')
@@ -1035,21 +1306,29 @@ export class ChecklistApp {
 
         table += '</tr></thead><tbody>';
 
-        this.filteredResponses.forEach((row, rowIndex) => {
-            table += '<tr>';
-            table += `<td><input type="checkbox" data-row="${rowIndex}" ${row.includeInReport ? 'checked' : ''}></td>`;
-            table += `<td>${row.timestamp}</td>`;
-            table += `<td>${row.generatedBy}</td>`;
-            table += `<td>${row.inspectedParts}</td>`;
-            table += `<td>${row.ioParts}</td>`;
-            table += `<td>${row.nioParts}</td>`;
+        if (this.filteredResponses.length === 0) {
+            // Show empty row with message
+            const colCount = 6 + questionIds.length;
+            table += `<tr><td colspan="${colCount}" style="text-align: center; padding: 2rem; color: #6c757d;">
+                ${this.translationManager.translate('no-responses-yet') || 'Noch keine Antworten vorhanden.'}
+            </td></tr>`;
+        } else {
+            this.filteredResponses.forEach((row, rowIndex) => {
+                table += '<tr>';
+                table += `<td><input type="checkbox" data-row="${rowIndex}" ${row.includeInReport ? 'checked' : ''}></td>`;
+                table += `<td>${row.timestamp}</td>`;
+                table += `<td>${row.generatedBy}</td>`;
+                table += `<td>${row.inspectedParts}</td>`;
+                table += `<td>${row.ioParts}</td>`;
+                table += `<td>${row.nioParts}</td>`;
 
-            questionIds.forEach(qId => {
-                table += `<td data-row="${rowIndex}" data-field="${qId}">${row.answers[qId] || ''}</td>`;
+                questionIds.forEach(qId => {
+                    table += `<td data-row="${rowIndex}" data-field="${qId}">${row.answers[qId] || ''}</td>`;
+                });
+
+                table += '</tr>';
             });
-
-            table += '</tr>';
-        });
+        }
 
         table += '</tbody></table>';
         container.innerHTML = table;
@@ -1194,14 +1473,37 @@ export class ChecklistApp {
         const minDate = new Date(Math.min(...timestamps.map(d => d.getTime())));
         const maxDate = new Date(Math.max(...timestamps.map(d => d.getTime())));
 
+        // Count checklists with overall OK vs NOK status
+        let checklistsOK = 0;
+        let checklistsNOK = 0;
+
+        selected.forEach(row => {
+            // Check if this checklist has any NOK answers (excluding headers and non-IO/NIO questions)
+            let hasNOK = false;
+            this.currentChecklist!.questions.forEach(question => {
+                if (question.type !== 'header' && question.includeInIoNio) {
+                    const answer = row.answers[question.id];
+                    if (answer === 'NOK') {
+                        hasNOK = true;
+                    }
+                }
+            });
+
+            if (hasNOK) {
+                checklistsNOK++;
+            } else {
+                checklistsOK++;
+            }
+        });
+
         const reportData: ReportData = {
             title: this.translationManager.translate('report-main-title'),
             generatedOn: now.toLocaleDateString(lang === 'de' ? 'de-DE' : 'en-US'),
             selectedRange: `${minDate.toLocaleDateString(lang === 'de' ? 'de-DE' : 'en-US')} - ${maxDate.toLocaleDateString(lang === 'de' ? 'de-DE' : 'en-US')}`,
             inspectedParts: selected.reduce((sum, r) => sum + parseInt(r.inspectedParts || '0'), 0),
             generatedBy: this.currentUser?.name || '',
-            ioParts: selected.reduce((sum, r) => sum + r.ioParts, 0),
-            nioParts: selected.reduce((sum, r) => sum + r.nioParts, 0),
+            ioParts: checklistsOK,
+            nioParts: checklistsNOK,
             checkingSteps: []
         };
 
@@ -1242,8 +1544,13 @@ export class ChecklistApp {
         const container = document.getElementById('report-content');
         if (!container) return;
 
+        const logoHtml = this.currentChecklist?.reportSettings?.logo?.base64 
+            ? `<div class="report-logo"><img src="${this.currentChecklist.reportSettings.logo.base64}" alt="Company Logo" /></div>`
+            : '';
+
         container.innerHTML = `
             <div class="report-header">
+                ${logoHtml}
                 <div class="report-info">
                     <h1 class="report-title" contenteditable="true">${data.title}</h1>
                     <div class="report-field">
