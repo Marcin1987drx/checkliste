@@ -1,0 +1,28 @@
+{
+  "name": "checklist-offline-app",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "100% offline web application for creating, editing and filling checklists with PDF reports",
+  "main": "index.html",
+  "scripts": {
+    "build": "tsc && rollup -c",
+    "watch": "tsc --watch",
+    "dev": "tsc && rollup -c && npx http-server -c-1 -p 8080"
+  },
+  "keywords": [
+    "checklist",
+    "offline",
+    "pdf",
+    "typescript"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@rollup/plugin-node-resolve": "^15.2.3",
+    "@rollup/plugin-typescript": "^11.1.6",
+    "http-server": "^14.1.1",
+    "rollup": "^4.9.6",
+    "tslib": "^2.8.1",
+    "typescript": "^5.3.3"
+  }
+}

@@ -1,0 +1,90 @@
+{
+  "id": "EXAMPLE_QA",
+  "name": "Beispiel Qualitätskontrolle",
+  "description": "Beispiel Checkliste für Qualitätskontrolle - Example Quality Control Checklist",
+  "questions": [
+    {
+      "id": "header1",
+      "textDe": "SEKTION 1: VISUELLE INSPEKTION",
+      "textEn": "SECTION 1: VISUAL INSPECTION",
+      "type": "header",
+      "includeInIoNio": false,
+      "order": 1
+    },
+    {
+      "id": "q1",
+      "textDe": "Sind alle Teile vollständig und unbeschädigt?",
+      "textEn": "Are all parts complete and undamaged?",
+      "type": "bool_ok_nok_na",
+      "vdaCode": "P2.1",
+      "weight": 10,
+      "maxPoints": 100,
+      "includeInIoNio": true,
+      "order": 2
+    },
+    {
+      "id": "q2",
+      "textDe": "Ist die Oberfläche frei von Kratzern?",
+      "textEn": "Is the surface free of scratches?",
+      "type": "bool_ok_nok_na",
+      "vdaCode": "P2.2",
+      "weight": 8,
+      "maxPoints": 80,
+      "includeInIoNio": true,
+      "order": 3
+    },
+    {
+      "id": "q3",
+      "textDe": "Entspricht die Farbe der Spezifikation?",
+      "textEn": "Does the color match the specification?",
+      "type": "bool_ok_nok_na",
+      "vdaCode": "P2.3",
+      "weight": 5,
+      "maxPoints": 50,
+      "includeInIoNio": true,
+      "order": 4
+    },
+    {
+      "id": "header2",
+      "textDe": "SEKTION 2: FUNKTIONSTEST",
+      "textEn": "SECTION 2: FUNCTIONAL TEST",
+      "type": "header",
+      "includeInIoNio": false,
+      "order": 5
+    },
+    {
+      "id": "q4",
+      "textDe": "Funktioniert das Produkt ordnungsgemäß?",
+      "textEn": "Does the product function properly?",
+      "type": "bool_ok_nok_na",
+      "vdaCode": "P3.1",
+      "weight": 15,
+      "maxPoints": 150,
+      "includeInIoNio": true,
+      "order": 6
+    },
+    {
+      "id": "q5",
+      "textDe": "Bewerten Sie die Gesamtqualität (1=sehr schlecht, 5=ausgezeichnet)",
+      "textEn": "Rate the overall quality (1=very poor, 5=excellent)",
+      "type": "scale",
+      "scaleMin": 1,
+      "scaleMax": 5,
+      "weight": 10,
+      "maxPoints": 50,
+      "includeInIoNio": false,
+      "order": 7
+    },
+    {
+      "id": "q6",
+      "textDe": "Zusätzliche Bemerkungen",
+      "textEn": "Additional comments",
+      "type": "long_text",
+      "includeInIoNio": false,
+      "order": 8
+    }
+  ],
+  "reportSettings": {
+    "title": "Warenausgangskontrollbericht / Outgoing Goods Control Report"
+  }
+}

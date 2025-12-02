@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Checklist Offline App</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="app-header">
+            <h1 id="app-title">Checklist Manager</h1>
+            <div class="header-controls">
+                <div class="user-selector">
+                    <label id="user-label">Benutzer:</label>
+                    <select id="user-select"></select>
+                    <button id="add-user-btn" class="btn-icon" title="Neuer Benutzer">+</button>
+                </div>
+                <div class="language-selector">
+                    <button id="lang-de" class="btn-lang active">DE</button>
+                    <button id="lang-en" class="btn-lang">EN</button>
+                </div>
+                <button id="folder-select-btn" class="btn-primary" title="Arbeitsordner wählen">📁 <span id="folder-btn-text">Ordner wählen</span></button>
+            </div>
+        </header>
+
+        <!-- Navigation Tabs -->
+        <nav class="tab-nav">
+            <button class="tab-btn active" data-view="checklist-list" id="tab-list">
+                <span class="tab-text">Checklisten</span>
+            </button>
+            <button class="tab-btn" data-view="checklist-editor" id="tab-editor" disabled>
+                <span class="tab-text">Editor</span>
+            </button>
+            <button class="tab-btn" data-view="fill-checklist" id="tab-fill" disabled>
+                <span class="tab-text">Ausfüllen</span>
+            </button>
+            <button class="tab-btn" data-view="response-grid" id="tab-grid" disabled>
+                <span class="tab-text">Antworten</span>
+            </button>
+            <button class="tab-btn" data-view="report-generator" id="tab-report" disabled>
+                <span class="tab-text">Bericht</span>
+            </button>
+            <button class="tab-btn" data-view="translations" id="tab-translations">
+                <span class="tab-text">Übersetzungen</span>
+            </button>
+        </nav>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- View 1: Checklist List -->
+            <section id="view-checklist-list" class="view active">
+                <div class="view-header">
+                    <h2 id="list-title">Meine Checklisten</h2>
+                    <button id="create-checklist-btn" class="btn-primary" disabled>
+                        <span id="create-checklist-text">+ Neue Checkliste</span>
+                    </button>
+                </div>
+                <div id="folder-info" class="info-box hidden">
+                    <p id="folder-path-text">Arbeitsordner: <span id="folder-path">-</span></p>
+                </div>
+                <div id="checklist-container" class="checklist-grid">
+                    <div class="empty-state" id="empty-state">
+                        <p id="empty-state-text">Bitte wählen Sie einen Arbeitsordner aus.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- View 2: Checklist Editor -->
+            <section id="view-checklist-editor" class="view">
+                <div class="view-header">
+                    <button id="back-to-list-from-editor" class="btn-secondary">← <span id="back-text-editor">Zurück</span></button>
+                    <h2 id="editor-title">Checkliste bearbeiten</h2>
+                    <button id="save-checklist-btn" class="btn-primary">
+                        <span id="save-checklist-text">💾 Speichern</span>
+                    </button>
+                </div>
+                <div class="editor-container">
+                    <div class="checklist-meta">
+                        <div class="form-group">
+                            <label id="checklist-name-label">Name:</label>
+                            <input type="text" id="checklist-name" class="form-input">
+                        </div>
+                        <div class="form-group">
+                            <label id="checklist-desc-label">Beschreibung:</label>
+                            <textarea id="checklist-description" class="form-input" rows="2"></textarea>
+                        </div>
+                    </div>
+                    <div class="questions-section">
+                        <div class="section-header">
+                            <h3 id="questions-title">Fragen</h3>
+                            <button id="add-question-btn" class="btn-primary">
+                                <span id="add-question-text">+ Frage hinzufügen</span>
+                            </button>
+                        </div>
+                        <div id="questions-list" class="questions-list"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- View 3: Fill Checklist -->
+            <section id="view-fill-checklist" class="view">
+                <div class="view-header">
+                    <button id="back-to-list-from-fill" class="btn-secondary">← <span id="back-text-fill">Zurück</span></button>
+                    <h2 id="fill-title">Checkliste ausfüllen</h2>
+                    <button id="submit-checklist-btn" class="btn-primary">
+                        <span id="submit-checklist-text">💾 Speichern</span>
+                    </button>
+                </div>
+                <div class="fill-container">
+                    <div class="fill-meta">
+                        <h3 id="fill-meta-title">Informationen</h3>
+                        <div class="form-group">
+                            <label id="fill-datetime-label">Datum/Zeit:</label>
+                            <input type="datetime-local" id="fill-datetime" class="form-input">
+                        </div>
+                        <div class="form-group">
+                            <label id="fill-parts-label">Geprüfte Teile:</label>
+                            <input type="text" id="fill-inspected-parts" class="form-input">
+                        </div>
+                        <div class="form-group">
+                            <label id="fill-operator-label">Operator:</label>
+                            <input type="text" id="fill-operator" class="form-input" readonly>
+                        </div>
+                    </div>
+                    <div class="fill-questions">
+                        <h3 id="fill-questions-title">Fragen</h3>
+                        <div id="fill-questions-list" class="fill-questions-list"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- View 4: Response Grid -->
+            <section id="view-response-grid" class="view">
+                <div class="view-header">
+                    <button id="back-to-list-from-grid" class="btn-secondary">← <span id="back-text-grid">Zurück</span></button>
+                    <h2 id="grid-title">Antworten Datenbank</h2>
+                </div>
+                <div class="grid-controls">
+                    <div class="filter-group">
+                        <label id="filter-from-label">Von:</label>
+                        <input type="date" id="filter-date-from" class="form-input">
+                        <label id="filter-to-label">Bis:</label>
+                        <input type="date" id="filter-date-to" class="form-input">
+                        <button id="apply-filter-btn" class="btn-secondary">
+                            <span id="apply-filter-text">Filter anwenden</span>
+                        </button>
+                    </div>
+                    <div class="selection-controls">
+                        <button id="select-all-btn" class="btn-secondary">
+                            <span id="select-all-text">Alle auswählen</span>
+                        </button>
+                        <button id="deselect-all-btn" class="btn-secondary">
+                            <span id="deselect-all-text">Alle abwählen</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="grid-container">
+                    <div id="response-grid" class="response-grid"></div>
+                </div>
+            </section>
+
+            <!-- View 5: Report Generator -->
+            <section id="view-report-generator" class="view">
+                <div class="view-header">
+                    <button id="back-to-list-from-report" class="btn-secondary">← <span id="back-text-report">Zurück</span></button>
+                    <h2 id="report-title">Bericht Generator</h2>
+                    <button id="export-pdf-btn" class="btn-primary">
+                        <span id="export-pdf-text">📄 PDF Exportieren</span>
+                    </button>
+                </div>
+                <div id="report-preview" class="report-preview">
+                    <div class="report-container" id="report-content">
+                        <!-- Report will be generated here -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- View 6: Translations Editor -->
+            <section id="view-translations" class="view">
+                <div class="view-header">
+                    <h2 id="translations-title">Übersetzungen bearbeiten</h2>
+                    <button id="save-translations-btn" class="btn-primary">
+                        <span id="save-translations-text">💾 Speichern</span>
+                    </button>
+                </div>
+                <div class="translations-container">
+                    <div class="translations-info">
+                        <p id="translations-info-text">Hier können Sie die Übersetzungen für die Benutzeroberfläche bearbeiten.</p>
+                    </div>
+                    <div id="translations-list" class="translations-list"></div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Modal for creating new checklist -->
+        <div id="new-checklist-modal" class="modal hidden">
+            <div class="modal-content">
+                <h3 id="new-checklist-modal-title">Neue Checkliste erstellen</h3>
+                <div class="form-group">
+                    <label id="new-checklist-id-label">ID:</label>
+                    <input type="text" id="new-checklist-id" class="form-input" placeholder="z.B. QA_001">
+                </div>
+                <div class="form-group">
+                    <label id="new-checklist-name-label">Name:</label>
+                    <input type="text" id="new-checklist-name" class="form-input" placeholder="z.B. Qualitätskontrolle">
+                </div>
+                <div class="form-group">
+                    <label id="new-checklist-desc-label">Beschreibung:</label>
+                    <textarea id="new-checklist-desc" class="form-input" rows="3"></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button id="cancel-new-checklist" class="btn-secondary">
+                        <span id="cancel-new-checklist-text">Abbrechen</span>
+                    </button>
+                    <button id="confirm-new-checklist" class="btn-primary">
+                        <span id="confirm-new-checklist-text">Erstellen</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal for adding new user -->
+        <div id="new-user-modal" class="modal hidden">
+            <div class="modal-content">
+                <h3 id="new-user-modal-title">Neuer Benutzer</h3>
+                <div class="form-group">
+                    <label id="new-user-name-label">Name:</label>
+                    <input type="text" id="new-user-name" class="form-input" placeholder="Vorname Nachname">
+                </div>
+                <div class="modal-actions">
+                    <button id="cancel-new-user" class="btn-secondary">
+                        <span id="cancel-new-user-text">Abbrechen</span>
+                    </button>
+                    <button id="confirm-new-user" class="btn-primary">
+                        <span id="confirm-new-user-text">Hinzufügen</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="lib/html2pdf.bundle.min.js"></script>
+    <script src="dist/bundle.js"></script>
+</body>
+</html>
