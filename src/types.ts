@@ -27,6 +27,8 @@ export interface Question {
     scaleMin?: number; // For scale
     scaleMax?: number; // For scale
     order: number;
+    imageBase64?: string; // Image attached to question
+    imageName?: string; // Original filename
 }
 
 export interface Checklist {

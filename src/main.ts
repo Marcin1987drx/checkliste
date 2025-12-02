@@ -10,6 +10,9 @@ export class ChecklistApp {
     private users: User[] = [];
     private responses: ResponseRow[] = [];
     private filteredResponses: ResponseRow[] = [];
+    private currentSectionIndex: number = 0;
+    private sections: Question[][] = [];
+    private currentAnswers: Record<string, string> = {}; // Store answers as we go through sections
 
     constructor() {
         this.dataManager = new DataManager();
@@ -94,10 +97,14 @@ export class ChecklistApp {
 
         // Fill actions
         document.getElementById('back-to-list-from-fill')?.addEventListener('click', () => {
+            this.currentAnswers = {}; // Clear answers on back
+            this.currentSectionIndex = 0;
             this.showView('checklist-list');
         });
         document.getElementById('submit-checklist-btn')?.addEventListener('click', () => {
-            this.submitChecklist();
+            // Save current section and show summary
+            this.saveCurrentSectionAnswers();
+            this.showSummary();
         });
 
         // Grid actions
@@ -370,6 +377,16 @@ export class ChecklistApp {
                         ${this.translationManager.translate('include-in-io-nio')}
                     </label>
                 </div>
+                <div class="form-group">
+                    <label>${this.translationManager.translate('question-image') || 'Bild hinzuf\u00fcgen'}</label>
+                    <input type="file" class="form-input q-image" accept="image/*">
+                    ${question.imageBase64 ? `
+                        <div class="image-preview">
+                            <img src="${question.imageBase64}" alt="${question.imageName || 'Preview'}" />
+                            <button type="button" class="btn-secondary btn-remove-image">\u00d7 ${this.translationManager.translate('remove-image') || 'Entfernen'}</button>
+                        </div>
+                    ` : ''}
+                </div>
             </div>
         `;
 
@@ -378,6 +395,25 @@ export class ChecklistApp {
         div.querySelector('.btn-move-down')?.addEventListener('click', () => this.moveQuestion(question.id, 1));
         div.querySelector('.btn-duplicate')?.addEventListener('click', () => this.duplicateQuestion(question.id));
         div.querySelector('.btn-delete')?.addEventListener('click', () => this.deleteQuestion(question.id));
+        
+        // Image upload
+        const imageInput = div.querySelector('.q-image') as HTMLInputElement;
+        imageInput?.addEventListener('change', async (e) => {
+            const file = (e.target as HTMLInputElement).files?.[0];
+            if (file) {
+                const base64 = await this.fileToBase64(file);
+                question.imageBase64 = base64;
+                question.imageName = file.name;
+                this.renderQuestions();
+            }
+        });
+        
+        // Remove image
+        div.querySelector('.btn-remove-image')?.addEventListener('click', () => {
+            question.imageBase64 = undefined;
+            question.imageName = undefined;
+            this.renderQuestions();
+        });
 
         // Auto-save on change
         div.querySelectorAll('input, select').forEach(input => {
@@ -526,6 +562,7 @@ export class ChecklistApp {
             operatorInput.value = this.currentUser?.name || '';
         }
 
+        this.currentSectionIndex = 0; // Reset to first section
         this.renderFillQuestions();
         this.showView('fill-checklist');
     }
@@ -534,29 +571,207 @@ export class ChecklistApp {
         const container = document.getElementById('fill-questions-list');
         if (!container || !this.currentChecklist) return;
 
-        container.innerHTML = '';
-
+        // Split questions into sections
+        this.sections = [];
         const lang = this.translationManager.getLanguage();
         const questions = [...this.currentChecklist.questions].sort((a, b) => a.order - b.order);
-
+        
+        let currentSection: Question[] = [];
         questions.forEach(question => {
+            if (question.type === 'header' && currentSection.length > 0) {
+                this.sections.push(currentSection);
+                currentSection = [question];
+            } else {
+                currentSection.push(question);
+            }
+        });
+        if (currentSection.length > 0) {
+            this.sections.push(currentSection);
+        }
+
+        // Render current section
+        this.renderCurrentSection();
+    }
+
+    private renderCurrentSection(): void {
+        const container = document.getElementById('fill-questions-list');
+        if (!container || this.sections.length === 0) return;
+
+        const lang = this.translationManager.getLanguage();
+        const section = this.sections[this.currentSectionIndex];
+        
+        container.innerHTML = '';
+
+        section.forEach(question => {
             const div = document.createElement('div');
-            div.className = question.type === 'header' ? 'fill-question-item header-item' : 'fill-question-item';
+            div.className = question.type === 'header' ? 'fill-section-header' : 'fill-question-item';
             div.setAttribute('data-question-id', question.id);
 
             const questionText = lang === 'de' ? question.textDe : question.textEn;
 
             if (question.type === 'header') {
-                div.textContent = questionText;
+                div.innerHTML = `<h3 class="section-title">${questionText}</h3>`;
             } else {
+                let imageHtml = '';
+                if (question.imageBase64) {
+                    imageHtml = `<div class="question-image"><img src="${question.imageBase64}" alt="${question.imageName || 'Question image'}" /></div>`;
+                }
                 div.innerHTML = `
                     <div class="fill-question-text">${questionText}</div>
+                    ${imageHtml}
                     ${this.createAnswerControl(question)}
                 `;
             }
 
             container.appendChild(div);
         });
+
+        // Add event listeners for answer buttons
+        this.setupAnswerButtonListeners();
+
+        // Restore previously saved answers
+        this.restoreSectionAnswers();
+
+        // Update navigation buttons
+        this.updateSectionNavigation();
+    }
+
+    private setupAnswerButtonListeners(): void {
+        document.querySelectorAll('.answer-control-bool .answer-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const target = e.currentTarget as HTMLElement;
+                const parent = target.parentElement;
+                parent?.querySelectorAll('.answer-btn').forEach(b => b.classList.remove('selected', 'ok', 'nok'));
+                target.classList.add('selected');
+                const value = target.getAttribute('data-value');
+                if (value === 'OK') target.classList.add('ok');
+                if (value === 'NOK') target.classList.add('nok');
+            });
+        });
+    }
+
+    private updateSectionNavigation(): void {
+        const navContainer = document.getElementById('section-navigation');
+        if (!navContainer) {
+            // Create navigation container
+            const fillContainer = document.querySelector('.fill-questions');
+            if (fillContainer) {
+                const nav = document.createElement('div');
+                nav.id = 'section-navigation';
+                nav.className = 'section-navigation';
+                fillContainer.appendChild(nav);
+            }
+        }
+
+        const nav = document.getElementById('section-navigation');
+        if (!nav) return;
+
+        const isFirstSection = this.currentSectionIndex === 0;
+        const isLastSection = this.currentSectionIndex === this.sections.length - 1;
+
+        nav.innerHTML = `
+            <button id="prev-section-btn" class="btn-secondary" ${isFirstSection ? 'disabled' : ''}>
+                ← ${this.translationManager.translate('previous-section') || 'Vorherige'}
+            </button>
+            <span class="section-indicator">
+                ${this.translationManager.translate('section-text') || 'Abschnitt'} ${this.currentSectionIndex + 1} / ${this.sections.length}
+            </span>
+            <button id="next-section-btn" class="btn-primary" ${isLastSection ? 'disabled' : ''}>
+                ${this.translationManager.translate('next-section') || 'Nächste'} →
+            </button>
+        `;
+
+        // Add event listeners
+        const prevBtn = document.getElementById('prev-section-btn');
+        const nextBtn = document.getElementById('next-section-btn');
+
+        prevBtn?.addEventListener('click', () => {
+            if (this.currentSectionIndex > 0) {
+                this.saveCurrentSectionAnswers();
+                this.currentSectionIndex--;
+                this.renderCurrentSection();
+            }
+        });
+
+        nextBtn?.addEventListener('click', () => {
+            this.saveCurrentSectionAnswers();
+            if (this.currentSectionIndex < this.sections.length - 1) {
+                this.currentSectionIndex++;
+                this.renderCurrentSection();
+            } else {
+                // Last section - show summary
+                this.showSummary();
+            }
+        });
+    }
+
+    private saveCurrentSectionAnswers(): void {
+        if (!this.sections[this.currentSectionIndex]) return;
+
+        const section = this.sections[this.currentSectionIndex];
+        
+        section.forEach(question => {
+            if (question.type === 'header') return;
+
+            const item = document.querySelector(`[data-question-id="${question.id}"]`);
+            if (!item) return;
+
+            let answer = '';
+
+            if (question.type === 'bool_ok_nok_na') {
+                const selected = item.querySelector('.answer-btn.selected');
+                answer = selected ? (selected as HTMLElement).getAttribute('data-value') || '' : '';
+            } else if (question.type === 'scale') {
+                const checked = item.querySelector('input[type="radio"]:checked') as HTMLInputElement;
+                answer = checked ? checked.value : '';
+            } else if (question.type === 'single_choice') {
+                answer = (item.querySelector('.answer-select') as HTMLSelectElement).value;
+            } else if (question.type === 'short_text' || question.type === 'long_text') {
+                answer = (item.querySelector('.answer-text') as HTMLInputElement | HTMLTextAreaElement).value;
+            }
+
+            if (answer) {
+                this.currentAnswers[question.id] = answer;
+            }
+        });
+    }
+
+    private restoreSectionAnswers(): void {
+        if (!this.sections[this.currentSectionIndex]) return;
+
+        const section = this.sections[this.currentSectionIndex];
+        
+        // Wait for DOM to be ready
+        setTimeout(() => {
+            section.forEach(question => {
+                if (question.type === 'header' || !this.currentAnswers[question.id]) return;
+
+                const item = document.querySelector(`[data-question-id="${question.id}"]`);
+                if (!item) return;
+
+                const answer = this.currentAnswers[question.id];
+
+                if (question.type === 'bool_ok_nok_na') {
+                    const buttons = item.querySelectorAll('.answer-btn');
+                    buttons.forEach(btn => {
+                        if ((btn as HTMLElement).getAttribute('data-value') === answer) {
+                            btn.classList.add('selected');
+                            if (answer === 'OK') btn.classList.add('ok');
+                            if (answer === 'NOK') btn.classList.add('nok');
+                        }
+                    });
+                } else if (question.type === 'scale') {
+                    const radio = item.querySelector(`input[value="${answer}"]`) as HTMLInputElement;
+                    if (radio) radio.checked = true;
+                } else if (question.type === 'single_choice') {
+                    const select = item.querySelector('.answer-select') as HTMLSelectElement;
+                    if (select) select.value = answer;
+                } else if (question.type === 'short_text' || question.type === 'long_text') {
+                    const input = item.querySelector('.answer-text') as HTMLInputElement | HTMLTextAreaElement;
+                    if (input) input.value = answer;
+                }
+            });
+        }, 100);
     }
 
     private createAnswerControl(question: Question): string {
@@ -604,55 +819,105 @@ export class ChecklistApp {
         }
     }
 
-    private async submitChecklist(): Promise<void> {
+    private showSummary(): void {
+        if (!this.currentChecklist) return;
+
+        const container = document.getElementById('fill-questions-list');
+        const nav = document.getElementById('section-navigation');
+        if (!container) return;
+
+        const lang = this.translationManager.getLanguage();
+        let ioParts = 0;
+        let nioParts = 0;
+
+        // Calculate IO/NIO
+        this.currentChecklist.questions.forEach(question => {
+            if (question.type === 'header' || !question.includeInIoNio) return;
+            const answer = this.currentAnswers[question.id];
+            if (answer === 'OK') ioParts++;
+            else if (answer === 'NOK') nioParts++;
+        });
+
+        // Build summary HTML
+        let summaryHtml = `
+            <div class="summary-container">
+                <h2 class="summary-title">${this.translationManager.translate('summary-title') || 'Zusammenfassung'}</h2>
+                <div class="summary-stats">
+                    <div class="stat-box stat-ok">
+                        <div class="stat-label">✓ ${this.translationManager.translate('summary-ok') || 'OK'}</div>
+                        <div class="stat-value">${ioParts}</div>
+                    </div>
+                    <div class="stat-box stat-nok">
+                        <div class="stat-label">✗ ${this.translationManager.translate('summary-nok') || 'NOK'}</div>
+                        <div class="stat-value">${nioParts}</div>
+                    </div>
+                </div>
+                <div class="summary-questions">
+        `;
+
+        this.currentChecklist.questions.forEach(question => {
+            if (question.type === 'header') {
+                const questionText = lang === 'de' ? question.textDe : question.textEn;
+                summaryHtml += `<h3 class="summary-section-header">${questionText}</h3>`;
+                return;
+            }
+
+            const answer = this.currentAnswers[question.id] || '-';
+            const questionText = lang === 'de' ? question.textDe : question.textEn;
+            const isNok = answer === 'NOK';
+            const isOk = answer === 'OK';
+
+            summaryHtml += `
+                <div class="summary-question-item ${isNok ? 'item-nok' : ''} ${isOk ? 'item-ok' : ''}">
+                    <div class="summary-question-text">${questionText}</div>
+                    <div class="summary-answer ${isNok ? 'answer-nok' : ''} ${isOk ? 'answer-ok' : ''}">${answer}</div>
+                </div>
+            `;
+        });
+
+        summaryHtml += `
+                </div>
+                <div class="summary-actions">
+                    <button id="back-to-edit-btn" class="btn-secondary">
+                        ← ${this.translationManager.translate('back-to-edit') || 'Zurück zur Bearbeitung'}
+                    </button>
+                    <button id="confirm-save-btn" class="btn-primary">
+                        ✓ ${this.translationManager.translate('confirm-save') || 'Speichern bestätigen'}
+                    </button>
+                </div>
+            </div>
+        `;
+
+        container.innerHTML = summaryHtml;
+        if (nav) nav.style.display = 'none';
+
+        // Event listeners
+        document.getElementById('back-to-edit-btn')?.addEventListener('click', () => {
+            this.currentSectionIndex = this.sections.length - 1;
+            this.renderCurrentSection();
+            if (nav) nav.style.display = 'flex';
+        });
+
+        document.getElementById('confirm-save-btn')?.addEventListener('click', () => {
+            this.saveToDatabase();
+        });
+    }
+
+    private async saveToDatabase(): Promise<void> {
         if (!this.currentChecklist || !this.currentUser) return;
 
         const datetime = (document.getElementById('fill-datetime') as HTMLInputElement).value;
         const inspectedParts = (document.getElementById('fill-inspected-parts') as HTMLInputElement).value;
 
-        const answers: Record<string, string> = {};
         let ioParts = 0;
         let nioParts = 0;
 
-        // Collect answers
+        // Calculate IO/NIO
         this.currentChecklist.questions.forEach(question => {
-            if (question.type === 'header') return;
-
-            const item = document.querySelector(`[data-question-id="${question.id}"]`);
-            if (!item) return;
-
-            let answer = '';
-
-            if (question.type === 'bool_ok_nok_na') {
-                const selected = item.querySelector('.answer-btn.selected');
-                answer = selected ? (selected as HTMLElement).getAttribute('data-value') || '' : '';
-                
-                if (question.includeInIoNio) {
-                    if (answer === 'OK') ioParts++;
-                    else if (answer === 'NOK') nioParts++;
-                }
-            } else if (question.type === 'scale') {
-                const checked = item.querySelector('input[type="radio"]:checked') as HTMLInputElement;
-                answer = checked ? checked.value : '';
-            } else if (question.type === 'single_choice') {
-                answer = (item.querySelector('.answer-select') as HTMLSelectElement).value;
-            } else if (question.type === 'short_text' || question.type === 'long_text') {
-                answer = (item.querySelector('.answer-text') as HTMLInputElement | HTMLTextAreaElement).value;
-            }
-
-            answers[question.id] = answer;
-        });
-
-        // Set up button event listeners for bool_ok_nok_na after rendering
-        document.querySelectorAll('.answer-control-bool .answer-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const target = e.currentTarget as HTMLElement;
-                const parent = target.parentElement;
-                parent?.querySelectorAll('.answer-btn').forEach(b => b.classList.remove('selected', 'ok', 'nok'));
-                target.classList.add('selected');
-                if (target.getAttribute('data-value') === 'OK') target.classList.add('ok');
-                if (target.getAttribute('data-value') === 'NOK') target.classList.add('nok');
-            });
+            if (question.type === 'header' || !question.includeInIoNio) return;
+            const answer = this.currentAnswers[question.id];
+            if (answer === 'OK') ioParts++;
+            else if (answer === 'NOK') nioParts++;
         });
 
         const response: ResponseRow = {
@@ -663,7 +928,7 @@ export class ChecklistApp {
             ioParts,
             nioParts,
             includeInReport: false,
-            answers
+            answers: { ...this.currentAnswers }
         };
 
         const saved = await this.dataManager.appendResponse(this.currentChecklist.id, response);
@@ -685,6 +950,10 @@ export class ChecklistApp {
             // Enable grid and report tabs
             document.getElementById('tab-grid')?.removeAttribute('disabled');
             document.getElementById('tab-report')?.removeAttribute('disabled');
+
+            // Clear answers
+            this.currentAnswers = {};
+            this.currentSectionIndex = 0;
 
             this.showView('checklist-list');
         } else {
@@ -1097,6 +1366,15 @@ export class ChecklistApp {
             select.value = newUser.id;
             this.currentUser = newUser;
         }
+    }
+
+    private fileToBase64(file: File): Promise<string> {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
     }
 
     private populateUserSelect(): void {

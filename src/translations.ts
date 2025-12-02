@@ -46,6 +46,8 @@ export class TranslationManager {
         'move-down': { de: '↓', en: '↓' },
         'duplicate': { de: 'Duplizieren', en: 'Duplicate' },
         'delete': { de: 'Löschen', en: 'Delete' },
+        'question-image': { de: 'Bild hinzufügen', en: 'Add Image' },
+        'remove-image': { de: 'Entfernen', en: 'Remove' },
         
         // Question Types
         'type-bool_ok_nok_na': { de: 'OK/NOK/N/A', en: 'OK/NOK/N/A' },
@@ -69,6 +71,18 @@ export class TranslationManager {
         'answer-ok': { de: 'OK', en: 'OK' },
         'answer-nok': { de: 'NOK', en: 'NOK' },
         'answer-na': { de: 'N/A', en: 'N/A' },
+        
+        // Section Navigation
+        'previous-section': { de: 'Vorherige', en: 'Previous' },
+        'next-section': { de: 'Nächste', en: 'Next' },
+        'section-text': { de: 'Abschnitt', en: 'Section' },
+        
+        // Summary View
+        'summary-title': { de: 'Zusammenfassung', en: 'Summary' },
+        'summary-ok': { de: 'OK Teile', en: 'OK Parts' },
+        'summary-nok': { de: 'NOK Teile', en: 'NOK Parts' },
+        'back-to-edit': { de: 'Zurück zur Bearbeitung', en: 'Back to Edit' },
+        'confirm-save': { de: 'Speichern bestätigen', en: 'Confirm Save' },
         
         // Grid View
         'back-text-grid': { de: 'Zurück', en: 'Back' },
